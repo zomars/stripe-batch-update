@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "dotenv": "^10.0.0",
-    "node-fetch": "2"
+    "node-fetch": "2",
+    "stripe": "^8.191.0"
   },
   "devDependencies": {
     "@types/node": "^16.11.11",
