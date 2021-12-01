@@ -15,44 +15,49 @@ let pages = 0;
 let numOfRecords = 0;
 let delay = 0; //Used to stagger requests
 
-async function cleanAll(previousId?: string) {
-  const result = await cleanPage(previousId);
+async function updateAll(previousId?: string) {
+  const result = await updatePage(previousId);
   if (result === undefined || pages > maxPages) {
     return undefined;
   } else {
-    cleanAll(result);
+    updateAll(result);
   }
 }
 
-async function cleanPage(previousId?: string) {
+async function updatePage(previousId?: string) {
   pages++;
   console.log(`Fetching page ${pages}`);
-  const response = await stripe.customers.list(
+  // Change to stripe.SOMETHING you want to update
+  const response = await stripe.invoices.list(
     {
       limit: pageSize,
       starting_after: previousId || undefined,
+      expand: ["data.subscription"],
     },
     { timeout }
   );
   response.data
-    .filter((c) => c.description !== null && c.description !== "null")
+    // Filter out records here
+    .filter((c) => c.description !== null)
     .forEach((r: { id: string }) =>
-      setTimeout(() => cleanRecord(r.id), delay++ * 500)
+      setTimeout(() => updateRecord(r), delay++ * 500)
     );
   if (response.has_more === true) {
     let lastId = response.data[response.data.length - 1].id;
     console.log(`Fetching next page starting after id ${lastId}`);
     return lastId;
   } else {
-    console.log(`Cleaned ${numOfRecords} records`);
+    console.log(`Updated ${numOfRecords} records`);
     return undefined;
   }
 }
 
-async function cleanRecord(recordId?: string) {
+async function updateRecord(record: { id: any }) {
+  const recordId = record.id;
   numOfRecords++;
-  console.log(`Cleaning ${recordId}`);
+  console.log(`Updating ${recordId}`);
   try {
+    // Change to stripe.SOMETHING you want to update
     const response = await stripe.customers.update(
       recordId,
       {
@@ -60,11 +65,11 @@ async function cleanRecord(recordId?: string) {
       },
       { timeout }
     );
-    console.log(`Successfully cleaned ${recordId}`);
+    console.log(`Successfully updated ${recordId}`);
   } catch (error) {
-    console.error(`Failed to clean ${recordId}`);
-    console.error(error);
+    console.error(`Failed to update ${recordId}`);
+    console.error(error.message);
   }
 }
 
-cleanAll();
+updateAll();
