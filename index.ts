@@ -15,6 +15,10 @@ let pages = 0;
 let numOfRecords = 0;
 let delay = 0; //Used to stagger requests
 
+const recordToList = stripe.customers; // Change to stripe.SOMETHING you want to list
+const recordToUpdate = recordToList; // Change to stripe.SOMETHING you want to update
+type Record = Stripe.Customer; // Change to match your record to update
+
 async function updateAll(previousId?: string) {
   const result = await updatePage(previousId);
   if (result === undefined || pages > maxPages) {
@@ -27,21 +31,19 @@ async function updateAll(previousId?: string) {
 async function updatePage(previousId?: string) {
   pages++;
   console.log(`Fetching page ${pages}`);
-  // Change to stripe.SOMETHING you want to update
-  const response = await stripe.invoices.list(
+
+  const response = await recordToList.list(
     {
       limit: pageSize,
       starting_after: previousId || undefined,
-      expand: ["data.subscription"],
+      // You can add filters here
     },
     { timeout }
   );
   response.data
-    // Filter out records here
+    // Add extra filters here
     .filter((c) => c.description !== null)
-    .forEach((r: { id: string }) =>
-      setTimeout(() => updateRecord(r), delay++ * 500)
-    );
+    .forEach((r) => setTimeout(() => updateRecord(r), delay++ * 500));
   if (response.has_more === true) {
     let lastId = response.data[response.data.length - 1].id;
     console.log(`Fetching next page starting after id ${lastId}`);
@@ -52,20 +54,20 @@ async function updatePage(previousId?: string) {
   }
 }
 
-async function updateRecord(record: { id: any }) {
+async function updateRecord(record: Record) {
   const recordId = record.id;
   numOfRecords++;
   console.log(`Updating ${recordId}`);
   try {
-    // Change to stripe.SOMETHING you want to update
-    const response = await stripe.customers.update(
+    const updatedRecord = await recordToUpdate.update(
       recordId,
       {
+        // Change to desired values
         description: null,
       },
       { timeout }
     );
-    console.log(`Successfully updated ${recordId}`);
+    console.log(`Successfully updated ${updatedRecord.id}`);
   } catch (error) {
     console.error(`Failed to update ${recordId}`);
     console.error(error.message);
