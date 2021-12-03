@@ -15,9 +15,9 @@ let pages = 0;
 let numOfRecords = 0;
 let delay = 0; //Used to stagger requests
 
-const recordToList = stripe.customers; // Change to stripe.SOMETHING you want to list
+const recordToList = stripe.subscriptions; // Change to stripe.SOMETHING you want to list
 const recordToUpdate = recordToList; // Change to stripe.SOMETHING you want to update
-type Record = Stripe.Customer; // Change to match your record to update
+type Record = Stripe.Subscription; // Change to match your record to update
 
 async function updateAll(previousId?: string) {
   const result = await updatePage(previousId);
@@ -37,12 +37,14 @@ async function updatePage(previousId?: string) {
       limit: pageSize,
       starting_after: previousId || undefined,
       // You can add filters here
+      //   price: "price_1K1vchH8UDiwIftk2W5lXVkf", // Old Hosted Free Plan – Testing
+      price: "price_1K1bbSH8UDiwIftkUS5CAKkh", // Old Hosted Free Plan – Production
     },
     { timeout }
   );
   response.data
     // Add extra filters here
-    .filter((c) => c.description !== null)
+    // .filter((c) => c.description !== null)
     .forEach((r) => setTimeout(() => updateRecord(r), delay++ * 500));
   if (response.has_more === true) {
     let lastId = response.data[response.data.length - 1].id;
@@ -63,7 +65,15 @@ async function updateRecord(record: Record) {
       recordId,
       {
         // Change to desired values
-        description: null,
+        cancel_at_period_end: false,
+        proration_behavior: "create_prorations",
+        items: [
+          {
+            id: record.items.data[0].id,
+            // price: "price_1K2dWrH8UDiwIftkkfz6JUSD", // New Free Plan – Testing
+            price: "price_1K2fZNH8UDiwIftkmV47Mes3", // New Free Plan – Production
+          },
+        ],
       },
       { timeout }
     );
