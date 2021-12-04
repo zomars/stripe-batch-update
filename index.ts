@@ -32,6 +32,9 @@ async function updateAll(previousId?: string) {
   }
 }
 
+const OLD_FREE_PLAN_PRODUCTION = "price_1K1bbSH8UDiwIftkUS5CAKkh";
+const NEW_FREE_PLAN_PRODUCTION = "price_1K2fZNH8UDiwIftkmV47Mes3";
+
 async function updatePage(previousId?: string) {
   pages++;
   console.log(`Fetching page ${pages}`);
@@ -42,13 +45,14 @@ async function updatePage(previousId?: string) {
       starting_after: previousId || undefined,
       // You can add filters here
       //   price: "price_1K1vchH8UDiwIftk2W5lXVkf", // Old Hosted Free Plan – Testing
-      price: "price_1K1bbSH8UDiwIftkUS5CAKkh", // Old Hosted Free Plan – Production
+      price: OLD_FREE_PLAN_PRODUCTION,
+      expand: ["data.schedule"],
     },
     { timeout }
   );
   response.data
     // Add extra filters here
-    // .filter((c) => c.description !== null)
+    .filter((c) => !!c.schedule)
     .forEach((r) => setTimeout(() => updateRecord(r), delay++ * 500));
   if (response.has_more === true) {
     let lastId = response.data[response.data.length - 1].id;
@@ -61,22 +65,36 @@ async function updatePage(previousId?: string) {
 
 async function updateRecord(record: Record) {
   const recordId = record.id;
+  const schedule = record.schedule as Stripe.SubscriptionSchedule;
+  const newPhases = schedule.phases.map((p) => {
+    const newItems = p.items.map((i) =>
+      i.price === OLD_FREE_PLAN_PRODUCTION
+        ? {
+            ...i,
+            plan: NEW_FREE_PLAN_PRODUCTION,
+            price: NEW_FREE_PLAN_PRODUCTION,
+          }
+        : i
+    );
+    // console.log(`newItems`, newItems);
+    return {
+      start_date: p.start_date || undefined,
+      trial_end: p.trial_end || undefined,
+      end_date: p.end_date || undefined,
+      items: newItems,
+    };
+  });
+
+  //   console.log(`newPhases`, newPhases);
+
   numOfRecords++;
   console.log(`Updating ${recordId}`);
   try {
-    const updatedRecord = await recordToUpdate.update(
-      recordId,
+    const updatedRecord = await stripe.subscriptionSchedules.update(
+      schedule.id,
       {
-        // Change to desired values
-        cancel_at_period_end: false,
-        proration_behavior: "create_prorations",
-        items: [
-          {
-            id: record.items.data[0].id,
-            // price: "price_1K2dWrH8UDiwIftkkfz6JUSD", // New Free Plan – Testing
-            price: "price_1K2fZNH8UDiwIftkmV47Mes3", // New Free Plan – Production
-          },
-        ],
+        // @ts-ignore
+        phases: newPhases,
       },
       { timeout }
     );
