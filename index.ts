@@ -9,15 +9,15 @@ const stripe = new Stripe(process.env.STRIPE_KEY, {
 });
 
 const maxPages = 999999999; //The maximum number of pages of records to update
-const pageSize = 1000;
+const pageSize = 100;
 const timeout = 10000;
 let pages = 0;
 let numOfRecords = 0;
 let delay = 0; //Used to stagger requests
 
-const recordToList = stripe.subscriptions; // Change to stripe.SOMETHING you want to list
+const recordToList = stripe.invoices; // Change to stripe.SOMETHING you want to list
 const recordToUpdate = recordToList; // Change to stripe.SOMETHING you want to update
-type Record = Stripe.Subscription; // Change to match your record to update
+type Record = Stripe.Invoice; // Change to match your record to update
 
 async function updateAll(previousId?: string) {
   const result = await updatePage(previousId);
@@ -35,6 +35,11 @@ async function updateAll(previousId?: string) {
 const OLD_FREE_PLAN_PRODUCTION = "price_1K1bbSH8UDiwIftkUS5CAKkh";
 const NEW_FREE_PLAN_PRODUCTION = "price_1K2fZNH8UDiwIftkmV47Mes3";
 
+const now = new Date();
+const utcMilllisecondsSinceEpoch =
+  now.getTime() + now.getTimezoneOffset() * 60 * 1000;
+const utcSecondsSinceEpoch = Math.round(utcMilllisecondsSinceEpoch / 1000);
+
 async function updatePage(previousId?: string) {
   pages++;
   console.log(`Fetching page ${pages}`);
@@ -44,15 +49,18 @@ async function updatePage(previousId?: string) {
       limit: pageSize,
       starting_after: previousId || undefined,
       // You can add filters here
-      //   price: "price_1K1vchH8UDiwIftk2W5lXVkf", // Old Hosted Free Plan – Testing
-      price: OLD_FREE_PLAN_PRODUCTION,
-      expand: ["data.schedule"],
+      collection_method: "send_invoice",
+      // @ts-ignore
+      past_due: true,
+      due_date: { lt: utcSecondsSinceEpoch },
     },
     { timeout }
   );
   response.data
     // Add extra filters here
-    .filter((c) => !!c.schedule)
+    .filter((c) =>
+      c.lines.data.some((i) => i.plan.product === "prod_JVxwoOF5odFiZ8")
+    )
     .forEach((r) => setTimeout(() => updateRecord(r), delay++ * 500));
   if (response.has_more === true) {
     let lastId = response.data[response.data.length - 1].id;
@@ -65,40 +73,13 @@ async function updatePage(previousId?: string) {
 
 async function updateRecord(record: Record) {
   const recordId = record.id;
-  const schedule = record.schedule as Stripe.SubscriptionSchedule;
-  const newPhases = schedule.phases.map((p) => {
-    const newItems = p.items.map((i) =>
-      i.price === OLD_FREE_PLAN_PRODUCTION
-        ? {
-            ...i,
-            plan: NEW_FREE_PLAN_PRODUCTION,
-            price: NEW_FREE_PLAN_PRODUCTION,
-          }
-        : i
-    );
-    // console.log(`newItems`, newItems);
-    return {
-      start_date: p.start_date || undefined,
-      trial_end: p.trial_end || undefined,
-      end_date: p.end_date || undefined,
-      items: newItems,
-    };
-  });
-
-  //   console.log(`newPhases`, newPhases);
-
   numOfRecords++;
   console.log(`Updating ${recordId}`);
   try {
-    const updatedRecord = await stripe.subscriptionSchedules.update(
-      schedule.id,
-      {
-        // @ts-ignore
-        phases: newPhases,
-      },
-      { timeout }
-    );
-    console.log(`Successfully updated ${updatedRecord.id}`);
+    await recordToUpdate.voidInvoice(recordId, {
+      timeout,
+    });
+    console.log(`Successfully updated ${record.id}`);
   } catch (error) {
     console.error(`Failed to update ${recordId}`);
     console.error(error.message);
