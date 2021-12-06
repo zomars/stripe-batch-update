@@ -9,7 +9,7 @@ const stripe = new Stripe(process.env.STRIPE_KEY, {
 });
 
 const maxPages = 999999999; //The maximum number of pages of records to update
-const pageSize = 1000;
+const pageSize = 100;
 const timeout = 10000;
 let pages = 0;
 let numOfRecords = 0;
