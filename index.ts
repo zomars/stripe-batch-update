@@ -32,6 +32,9 @@ async function updateAll(previousId?: string) {
   }
 }
 
+const OLD_FREE_PLAN_PRODUCTION = "price_1K1bbSH8UDiwIftkUS5CAKkh";
+const NEW_FREE_PLAN_PRODUCTION = "price_1K2fZNH8UDiwIftkmV47Mes3";
+
 async function updatePage(previousId?: string) {
   pages++;
   console.log(`Fetching page ${pages}`);
@@ -42,7 +45,7 @@ async function updatePage(previousId?: string) {
       starting_after: previousId || undefined,
       // You can add filters here
       //   price: "price_1K1vchH8UDiwIftk2W5lXVkf", // Old Hosted Free Plan – Testing
-      price: "price_1K1bbSH8UDiwIftkUS5CAKkh", // Old Hosted Free Plan – Production
+      price: OLD_FREE_PLAN_PRODUCTION,
     },
     { timeout }
   );
@@ -73,8 +76,7 @@ async function updateRecord(record: Record) {
         items: [
           {
             id: record.items.data[0].id,
-            // price: "price_1K2dWrH8UDiwIftkkfz6JUSD", // New Free Plan – Testing
-            price: "price_1K2fZNH8UDiwIftkmV47Mes3", // New Free Plan – Production
+            price: NEW_FREE_PLAN_PRODUCTION,
           },
         ],
       },
