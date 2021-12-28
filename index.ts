@@ -2,9 +2,9 @@ import { PrismaClient } from "@prisma/client";
 import { config } from "dotenv";
 import Stripe from "stripe";
 
-const prisma = new PrismaClient();
-
 config();
+
+const prisma = new PrismaClient();
 
 // Set the STRIPE_KEY in .env file in the same directory as this file
 const stripe = new Stripe(process.env.STRIPE_KEY, {
@@ -24,7 +24,10 @@ type Record = Stripe.Subscription; // Change to match your record to update
 async function updateAll(previousId?: string) {
   const result = await updatePage(previousId);
   if (result === undefined || pages > maxPages) {
-    setTimeout(() => console.log(`Updated ${numOfRecords} records`), delay++ * 500);
+    setTimeout(
+      () => console.log(`Updated ${numOfRecords} records`),
+      delay++ * 500
+    );
     return undefined;
   } else {
     updateAll(result);
@@ -72,7 +75,7 @@ async function updateRecord(record: Record) {
         metadata: {
           stripeCustomerId: customer.id,
         },
-      },
+      },    
       where: {
         email: customer.email!,
       },
