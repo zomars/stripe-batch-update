@@ -1,5 +1,8 @@
+import { PrismaClient } from "@prisma/client";
 import { config } from "dotenv";
 import Stripe from "stripe";
+
+const prisma = new PrismaClient();
 
 config();
 
@@ -9,24 +12,26 @@ const stripe = new Stripe(process.env.STRIPE_KEY, {
 });
 
 const maxPages = 999999999; //The maximum number of pages of records to update
-const pageSize = 1000;
+const pageSize = 100;
 const timeout = 10000;
 let pages = 0;
 let numOfRecords = 0;
 let delay = 0; //Used to stagger requests
 
-const recordToList = stripe.customers; // Change to stripe.SOMETHING you want to list
-const recordToUpdate = recordToList; // Change to stripe.SOMETHING you want to update
-type Record = Stripe.Customer; // Change to match your record to update
+const recordToList = stripe.subscriptions; // Change to stripe.SOMETHING you want to list
+type Record = Stripe.Subscription; // Change to match your record to update
 
 async function updateAll(previousId?: string) {
   const result = await updatePage(previousId);
   if (result === undefined || pages > maxPages) {
+    setTimeout(() => console.log(`Updated ${numOfRecords} records`), delay++ * 500);
     return undefined;
   } else {
     updateAll(result);
   }
 }
+
+const PRO_PLAN_PRICE_PRODUCTION = "price_1Isw0bH8UDiwIftkETa8lRcj";
 
 async function updatePage(previousId?: string) {
   pages++;
@@ -36,42 +41,54 @@ async function updatePage(previousId?: string) {
     {
       limit: pageSize,
       starting_after: previousId || undefined,
-      // You can add filters here
+      price: PRO_PLAN_PRICE_PRODUCTION,
+      status: "active",
+      expand: ["data.customer"],
     },
     { timeout }
   );
   response.data
     // Add extra filters here
-    .filter((c) => c.description !== null)
+    // .filter((c) => !!c.schedule)
     .forEach((r) => setTimeout(() => updateRecord(r), delay++ * 500));
   if (response.has_more === true) {
-    let lastId = response.data[response.data.length - 1].id;
+    const lastId = response.data[response.data.length - 1].id;
     console.log(`Fetching next page starting after id ${lastId}`);
     return lastId;
   } else {
-    console.log(`Updated ${numOfRecords} records`);
     return undefined;
   }
 }
 
 async function updateRecord(record: Record) {
   const recordId = record.id;
+  const customer = record.customer as Stripe.Customer;
+
   numOfRecords++;
-  console.log(`Updating ${recordId}`);
+  console.log(`Updating customer ${customer.email}`);
   try {
-    const updatedRecord = await recordToUpdate.update(
-      recordId,
-      {
-        // Change to desired values
-        description: null,
+    const updatedRecord = await prisma.user.update({
+      data: {
+        metadata: {
+          stripeCustomerId: customer.id,
+        },
       },
-      { timeout }
-    );
+      where: {
+        email: customer.email!,
+      },
+    });
     console.log(`Successfully updated ${updatedRecord.id}`);
   } catch (error) {
     console.error(`Failed to update ${recordId}`);
-    console.error(error.message);
+    if (error instanceof Error) console.error(error.message);
   }
 }
 
-updateAll();
+updateAll()
+  .then(() => {
+    console.log("Added customer IDs to user metadata");
+  })
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
