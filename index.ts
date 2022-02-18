@@ -35,6 +35,10 @@ async function updateAll(previousId?: string) {
 }
 
 const PRO_PLAN_PRICE_PRODUCTION = "price_1Isw0bH8UDiwIftkETa8lRcj";
+const PRO_PLAN_ANUAL_PRICE_PRODUCTION = "price_1JyLPjH8UDiwIftkCf4sGBqt";
+const PREMIUM_PLAN_PRICE_PRODUCTION = "price_1JfQxkH8UDiwIftkIKlXr5gU";
+const ENTERPRISE_PLAN_PRICE_PRODUCTION = "price_1KBe7nH8UDiwIftkVZ9ISYjQ";
+const ENTERPRISE_50_PLAN_PRICE_PRODUCTION = "price_1JkVrNH8UDiwIftkzM1KYpk6";
 
 async function updatePage(previousId?: string) {
   pages++;
@@ -68,16 +72,28 @@ async function updateRecord(record: Record) {
   const customer = record.customer as Stripe.Customer;
 
   numOfRecords++;
-  console.log(`Updating customer ${customer.email}`);
+  console.log(`Updating customer ${customer.metadata.username}`);
   try {
+    const firstUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          {
+            username: customer.metadata.username!,
+          },
+          {
+            email: customer.email,
+          },
+        ],
+      },
+    });
     const updatedRecord = await prisma.user.update({
+      where: {
+        id: firstUser.id,
+      },
       data: {
         metadata: {
           stripeCustomerId: customer.id,
         },
-      },    
-      where: {
-        email: customer.email!,
       },
     });
     console.log(`Successfully updated ${updatedRecord.id}`);
